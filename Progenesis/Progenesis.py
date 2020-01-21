@@ -297,6 +297,7 @@ class ProgenesisData:
         x = data_with_matabs_columns.isnull().sum(axis=0)
         nan_cols = x[ x == data_with_matabs_columns.shape[0] ].index.tolist()
         if( len(nan_cols) > 0 ):
+            print("Some columns in your data contain only NaN's. ")
             data_with_matabs_columns = data_with_matabs_columns.T.drop(nan_cols).T
         
         self.data = data_with_matabs_columns
@@ -347,7 +348,7 @@ class ProgenesisData:
 
 
     def rename_IDs_with_E_in_name( self ):
-        '''If the ID contains a "E" in their name this is sometimes problematic, since it might be seen as a scientic number format. This
+        '''If the ID contains a "E" in their name this is sometimes problematic, since it might be seen as a scientic number format (and contains numbers before and after). This
         function replaces E for EE to avoid this from happening.
         '''
         f = lambda x: x.replace("E","EE") if 'E' in x else x
@@ -373,7 +374,7 @@ class ProgenesisData:
                 
                 data = data.assign( **{pair[0]+' + '+pair[1]:col_1 + col_2})
             except:
-                print('Error in merging (likely, pair not found):',pair)
+                print('Error in merging (likely, pair not found):', pair)
 
         self.data = data
 
@@ -425,8 +426,8 @@ class MergedProgenesisData:
  
         print("Load data sets")
 
-        # This function calls different other functions to find matching features between the reference batch (first batch in 'files') and other batches
-        # The results are stored in:
+        # This function (determine_overlapping_features() ) calls different other functions to find matching features between the reference batch (first batch in 'files') 
+        # and other batches. The results are stored in:
         #   1) self.matches_from_identifications
         #   2) self.matches_from_mz
         #   3) self.matches_from_nm
@@ -465,11 +466,11 @@ class MergedProgenesisData:
         return obj
 
 
-    # This functions calls different other funtions which searches for overlapping metabolites/features
+    # This functions calls different other funtions which searches for overlapping metabolites/features between reference batch and other batches
     def determine_overlapping_features(self):
         '''This function matches columns / features / metabolites between different datasets and stores it in self.column_matches '''
 
-        # Load first data. This is the dataset which is to be analysed and reference batch
+        # Load first data. This is the dataset which is to be analysed and si the reference batch
         obj = self.load_data( self.files[0] )
         main_data = obj.data.copy()
         main_data_IDs = [ ID for ID in obj.all_IDs ] # store IDs present in dataset
@@ -576,7 +577,6 @@ class MergedProgenesisData:
             # Add identification matches
             column_matches = self.matches_from_identifications[i].copy()
 
-
             # Add MSMS matches
             df = self.matches_from_msms[i]
             if( not df.empty ):
@@ -588,7 +588,6 @@ class MergedProgenesisData:
                 df = df.loc[ df['median_error'] <= median_error_threshold ]
 
                 column_matches = pd.concat([column_matches,df])
-
 
 
             # Add neutral mass matches
@@ -670,16 +669,10 @@ class MergedProgenesisData:
         x_1 = data_1.loc[IDs_1,info_column_matches['columns_1']]
         x_2 = data_2.loc[IDs_2,info_column_matches['columns_2']]
 
-        columns_1_not_merged =  list( set(remove_mz_from_list(data_1.columns)).difference( 
-                                                set(remove_mz_from_list(info_column_matches['columns_1']))
-                                                )
-                                        )
-
-        columns_2_not_merged =  list( set(remove_mz_from_list(data_2.columns)).difference( 
-                                                set(remove_mz_from_list(info_column_matches['columns_2']))
-                                                )
-                                        )
-
+        columns_1_not_merged =  list( set(remove_mz_from_list(data_1.columns)).difference( set(remove_mz_from_list(info_column_matches['columns_1'])) ) )
+                                            
+        columns_2_not_merged =  list( set(remove_mz_from_list(data_2.columns)).difference( set(remove_mz_from_list(info_column_matches['columns_2'])) ) )
+                                       
         not_merged = {'columns_1':columns_1_not_merged,'columns_2':columns_2_not_merged}
 
         # We use the information of data_1 as base, this will be used in the newly obtained merged dataset
@@ -834,7 +827,7 @@ class MergedProgenesisData:
 
 
     def find_same_identifications_between_datasets(data_1, IDs_1, data_2, IDs_2):
- 
+
         # We clean and check the availability of some data in the input datasets 
         def check_clean_data(data, IDs):
             assert( ('m/z' in data.index) and ('Retention time (min)' in data.index) and ('Isotope Distribution' in data.index) )
@@ -1045,7 +1038,7 @@ class MergedProgenesisData:
 
 
         try:
-            # Search the MSMS files which are supossed the have the same path and almost same name as the Progenesis file
+            # Search the MSMS files which are supossed the have the same path and almost same name as the Progenesis file !!!!!
             path_file_1 = path_file_1.replace('_UMETA_','_MS2_').replace('csv','msp')
             path_file_2 = path_file_2.replace('_UMETA_','_MS2_').replace('csv','msp')
 
