@@ -89,7 +89,7 @@ class NormBestCorrIS:
         
 
         mean_corr = corrs.groupby(by='metab').apply( lambda x: x[ self.IS_cols ].mean() )
-        best_IS = mean_corr.apply(lambda x: x.abs() == x.abs().max(),axis=1)
+        best_IS = mean_corr.apply(lambda x: x == x.max(),axis=1)
         metab_with_corr_IS = best_IS.apply(lambda x: x.index[ x ==True].tolist()[0] ,axis=1).to_dict()
              
         self.metab_with_corr_IS = metab_with_corr_IS
