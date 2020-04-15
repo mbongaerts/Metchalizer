@@ -66,7 +66,7 @@ class renamer:
             return x
         else:
             self.d[x] += "*"
-            return "%s%s" % (x, self.d[x])
+            return "{}{}".format(x, self.d[x])
 
 
 def remove_mz_from_list(names):
@@ -109,7 +109,7 @@ def file_name_to_batch_name(file_name, mode):
 def load_ms_ms_spec_data(path):
     """This function can be used to load msp-files. """
 
-    with open(path, "r") as f:
+    with open(path) as f:
         ms_ms_data = [l.strip("\n") for l in f]
 
     y = []
@@ -1483,7 +1483,7 @@ class MergedProgenesisData:
                 min_ppm_error_possible_nms_2=df_1.apply(
                     lambda x: min(
                         [
-                            np.abs((el - x["nm_1"])) / x["nm_1"] * 10 ** 6
+                            np.abs(el - x["nm_1"]) / x["nm_1"] * 10 ** 6
                             for el in x["possible_nms_2"]
                         ]
                     ),
@@ -1504,7 +1504,7 @@ class MergedProgenesisData:
                 min_ppm_error_possible_nms_1=df_2.apply(
                     lambda x: min(
                         [
-                            np.abs((el - x["nm_2"])) / x["nm_2"] * 10 ** 6
+                            np.abs(el - x["nm_2"]) / x["nm_2"] * 10 ** 6
                             for el in x["possible_nms_1"]
                         ]
                     ),

@@ -41,7 +41,7 @@ class WeightedMeanSigma:
             weigths = np.round(weigths, 10)
             weigths = weigths / np.sum(weigths)
 
-            weighted_mean = np.sum((weigths * self.sigma_train))
+            weighted_mean = np.sum(weigths * self.sigma_train)
             means.append(weighted_mean)
 
         return means

@@ -122,7 +122,7 @@ class NormMetchalizerLog:
                 X_trans_batch = X_trans.loc[IDs].iloc[:, 0:i]
                 c = X_trans_batch.mean(axis=0)
                 inertia += np.sum(
-                    np.linalg.norm(((X_trans_batch - c)).values, axis=1) ** 2
+                    np.linalg.norm((X_trans_batch - c).values, axis=1) ** 2
                 )
             print("K(" + str(i) + ") = " + str(round(inertia)))
             inertias.append(inertia)
