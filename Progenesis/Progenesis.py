@@ -426,9 +426,9 @@ class MergedProgenesisData:
         self,
         files,
         mz_ppm_error=1,
-        RT_percentage_error=5,
-        isotope_dist_percentage_error=20,
-        median_error_threshold=200,
+        RT_percentage_error=3,
+        isotope_dist_percentage_error=25,
+        median_error_threshold=300,
         correct_retention_times=True,
         **kwargs
     ):
@@ -822,8 +822,9 @@ class MergedProgenesisData:
     def check_merged_columns_on_duplicates(self):
         print("Check duplicate columns")
         data = self.data
-        duplicate_columns = data.columns.get_duplicates()
-        if len(duplicate_columns) > 0:
+        duplicate_columns = self.data.columns.duplicated()
+
+        if( np.sum( duplicate_columns ) > 0):
             print("Still duplicate columns in data ")
             self.data = data.rename(columns=renamer())
             print("Duplicates removed")
