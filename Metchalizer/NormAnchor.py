@@ -56,7 +56,7 @@ class NormAnchor:
 
         print("Total amount of Anchor samples:", len(self.anchor_samples))
 
-    def normalize(self):
+    def normalize(self, addition = 1 ):
         '''The "addition" parameter is used to prevent division by zero, make sure that this is a relative low number. '''
         data = self.data.copy()
 
