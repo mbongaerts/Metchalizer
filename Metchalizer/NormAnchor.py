@@ -57,25 +57,31 @@ class NormAnchor:
         print("Total amount of Anchor samples:", len(self.anchor_samples))
 
     def normalize(self):
+        '''The "addition" parameter is used to prevent division by zero, make sure that this is a relative low number. '''
         data = self.data.copy()
 
+        batch_means = []
+        for batch, IDs in self.batch_with_IDs.items():
+            data_batch = data.loc[ IDs,:]
+
+            anchor_samples_in_batch = [ ID for ID in IDs if ID in self.anchor_samples]
+            if( len(anchor_samples_in_batch)  == 0):
+                raise ValueError("Batch {} doesn't contain any Anchor samples".format(str(batch) ) )
+
+            anchor_mean = data_batch.loc[anchor_samples_in_batch].mean() + addition
+            anchor_mean.name = batch
+            batch_means.append(anchor_mean)
+
+        batch_means = pd.DataFrame(batch_means)
+
         df = pd.DataFrame([])
-        for batch_nr, IDs in self.batch_with_IDs.items():
-            data_batch = data.loc[IDs, :]
-
-            anchor_samples_in_batch = [ID for ID in IDs if ID in self.anchor_samples]
-            if len(anchor_samples_in_batch) == 0:
-                raise ValueError(
-                    "Batch {} doesn't contain any Anchor samples".format(str(batch_nr))
-                )
-
-            anchor_median = (
-                data_batch.loc[anchor_samples_in_batch].median().fillna(1).replace(0, 1)
-            )
-            df_ = data_batch / anchor_median
-            df = pd.concat([df, df_])
-
-        data_norm = df
+        for batch, IDs in self.batch_with_IDs.items():
+            data_batch = data.loc[ IDs,:]
+            df_ = (data_batch / batch_means.loc[batch]) * batch_means.mean()
+            df = pd.concat([df, df_])            
+            
+            
+        data_norm = df.copy()
 
         # Dont allow negative numbers
         data_norm[data_norm < 0] = 0
