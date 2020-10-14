@@ -43,9 +43,9 @@ class NormMetchalizer:
         raw_data,
         batch_with_IDs,
         prefix_IS="IS_",
-        prefix_QC_samples="recipe",
-        remove_outliers_Z_threshold=3,
-        interia_per_threshold=85,
+        prefix_QC_samples="QC_",
+        remove_outliers_Z_threshold=2,
+        interia_per_threshold=75,
         lambda_1=0.5,
         lambda_2=1,
     ):
@@ -59,16 +59,14 @@ class NormMetchalizer:
         self.interia_per_threshold = interia_per_threshold
         self.lambda_1 = lambda_1
         self.lambda_2 = lambda_2
+        self.features_with_failed_normalization = []
 
         IDs_having_batch_ID = []
         for batch, IDs_in_batch in self.batch_with_IDs.items():
             IDs_having_batch_ID.extend(IDs_in_batch)
 
         # Check if all sample IDs are present in IDs_with_batch
-        if (
-            not len(set(self.data.index.tolist()).difference(set(IDs_having_batch_ID)))
-            == 0
-        ):
+        if ( not len(set(self.data.index.tolist()).difference(set(IDs_having_batch_ID))) == 0 ):
             raise ValueError(
                 "Sample IDs present in data with are not in IDs_with_batch dictionary or vice versa."
             )
@@ -76,9 +74,9 @@ class NormMetchalizer:
         # Check if Internal Standards are present
         self.IS_cols = [col for col in self.data.columns if (self.prefix_IS in col)]
 
-        if len(self.IS_cols) == 0:
+        if( len(self.IS_cols) <= 1 ):
             raise ValueError(
-                "The columns should contain internal standard(s) indicates by "
+                "The columns should contain at least 2 internal standard(s) indicates by "
                 + prefix_IS
                 + ". "
             )
@@ -86,8 +84,8 @@ class NormMetchalizer:
 
         # Check if QC samples are present, although they are not used in this algorithm
         self.QC_samples = [ind for ind in self.data.index if (prefix_QC_samples in ind)]
-        if len(self.QC_samples) == 0:
-            print(" No QC sampels found ")
+        if( len(self.QC_samples) == 0 ):
+            print(" No QC samples found ")
 
     def normalize(self):
         data = self.data.copy()
@@ -100,55 +98,49 @@ class NormMetchalizer:
         data = data.apply(lambda x: box_cox(x, self.lambda_1, self.lambda_2))
 
         # Select IS data
-        X_predict_ = data.loc[:, self.IS_cols]
+        X_predict = data.loc[:, self.IS_cols]
 
         # Scale IS data
-        X_predict_ = (X_predict_ - X_predict_.median(axis=0)) / X_predict_.mad(axis=0)
+        X_predict = (X_predict - X_predict.median(axis=0)) / X_predict.mad(axis=0)
 
         batch_labels = pd.Series()
         for k, (batch, IDs) in enumerate(self.batch_with_IDs.items()):
-            batch_labels = batch_labels.append(
-                pd.Series([k for i in range(len(IDs))], index=IDs)
-            )
+            batch_labels = batch_labels.append(pd.Series([k for i in range(len(IDs))], index=IDs) )
+            
 
         # PLS
         le = LabelBinarizer()
-        pls = PLSRegression(n_components=X_predict_.shape[1])
-        y_pls = le.fit_transform(
-            X_predict_.assign(batch_labels=batch_labels)["batch_labels"]
-        )
-        pls.fit(X_predict_, y_pls)
+        pls = PLSRegression(n_components=X_predict.shape[1])
+        y_pls = le.fit_transform(X_predict.assign(batch_labels=batch_labels)["batch_labels"] )
+        pls.fit(X_predict, y_pls)
 
         # Obtain (PLS) PC's and store them in X_trans
-        X_trans = pls.transform(X_predict_)
-        X_trans = pd.DataFrame(X_trans, index=X_predict_.index)
+        X_trans = pls.transform(X_predict)
+        X_trans = pd.DataFrame(X_trans, index=X_predict.index)
 
         # Determine how many LV's (latent variables) are needed for regression / mixed effect model fit
         inertias = []
-        for i in range(0, X_predict_.shape[1]):
+        for i in range(0, X_predict.shape[1]):
             inertia = 0
             for k, (batch, IDs) in enumerate(self.batch_with_IDs.items()):
                 X_trans_batch = X_trans.loc[IDs].iloc[:, 0:i]
                 c = X_trans_batch.mean(axis=0)
-                inertia += np.sum(
-                    np.linalg.norm((X_trans_batch - c).values, axis=1) ** 2
-                )
+                inertia += np.sum(np.linalg.norm((X_trans_batch - c).values, axis=1) ** 2 )
+                
             print("K(" + str(i) + ") = " + str(round(inertia)))
             inertias.append(inertia)
 
         inertias_perc = inertias / np.max(inertias) * 100
         ind = np.where(inertias_perc > self.interia_per_threshold)[0][0]
-        self.n_components_PLS = range(0, X_predict_.shape[1])[ind] + 1
+        self.n_components_PLS = range(0, X_predict.shape[1])[ind] + 1
         print(str(self.n_components_PLS) + " LVs are taken.")
 
         # Refit PLS with the choosen amount of LV's
         LVs_cols = ["LV" + str(i + 1) for i in range(self.n_components_PLS)]
         pls = PLSRegression(n_components=self.n_components_PLS)
-        pls.fit(X_predict_, y_pls)
+        pls.fit(X_predict, y_pls)
 
-        X_PLS = pd.DataFrame(
-            pls.transform(X_predict_), index=X_predict_.index, columns=LVs_cols
-        )
+        X_PLS = pd.DataFrame(pls.transform(X_predict), index=X_predict.index, columns=LVs_cols )
         self.pls = pls
 
         # Iterate over all features/ metabolites
@@ -157,10 +149,10 @@ class NormMetchalizer:
             print("Batch correction ", str(i) + "/" + str(len(data.columns)), metab)
 
             # Get abundancies for metabolite and rescale
-            y_ = data[metab]
-            y_median = y_.median()
-            y_mad = y_.mad()
-            y_ = (y_ - y_median) / y_mad
+            y_metab = data[metab]
+            y_median = y_metab.median()
+            y_mad = y_metab.mad()
+            y_metab = (y_metab - y_median) / y_mad
 
             # Copy PLS decomposition matrix
             X_predict = X_PLS.copy()
@@ -171,14 +163,12 @@ class NormMetchalizer:
                 # Get (not-)outliers from within batch Z-score
                 y_k = data.loc[IDs, metab]
                 y_k = (y_k - y_k.mean()) / (y_k.std())
-                not_outliers.extend(
-                    y_k[y_k.abs() < self.remove_outliers_Z_threshold].index.tolist()
-                )
-
+                not_outliers.extend(y_k[y_k.abs() < self.remove_outliers_Z_threshold].index.tolist() )
+                
                 # Update X_predict with group name
                 X_predict.loc[IDs, "group"] = k
 
-            X_predict = X_predict.assign(y=y_)
+            X_predict = X_predict.assign(y=y_metab)
             X_predict["Intercept"] = 1
 
             predictor_cols = ["Intercept"]
@@ -204,9 +194,8 @@ class NormMetchalizer:
                     exog = X_predict[predictor_cols].loc[:]
                     groups = X_predict["group"].loc[:]
 
-                    md = sm.MixedLM(
-                        endog, exog, groups=groups, exog_re=exog["Intercept"]
-                    )
+                    md = sm.MixedLM(endog, exog, groups=groups, exog_re=exog["Intercept"] )
+                    
                     mdf = md.fit()
                     fit_succes = True
 
@@ -242,9 +231,7 @@ class NormMetchalizer:
                             df_["y_batch_corrected"]
                             - df_["y_IS_correction"]
                             + df_["y_IS_correction"].median()
-                        )
-                        * y_mad
-                        + y_median
+                        )* y_mad + y_median # <-- scaling back
                     }
                 )
                 df = df.T.append(df_[str(metab)].T).T
@@ -252,6 +239,7 @@ class NormMetchalizer:
             # Return original abundancies
             else:
                 df = df.T.append(data[metab].T).T
+                self.features_with_failed_normalization.append(metab)
 
         # Replace
         data = df
